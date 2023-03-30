@@ -33,14 +33,14 @@ def HAL(fit_configs, traj_configs, basis_source, solver, fit_kwargs, n_iters, re
         initial fitting configs
     traj_configs: list(Atoms)
         configs to start trajectories from
-    basis_source: str 
+    basis_source: str
         module with basis or text string with julia source to construct basis
     solver: sklearn-compatible LinearSolver
         solvers for model parameter design matrix linear problem
     fit_kwargs: dict
         User (not HAL provided) keyword args for `fit.fit()`, in particular "E0s", "data_keys", and "weights".
         HAL will provide "atoms_list", "solver", "B_len_norm", and "return_linear_problem".
-        NOTE: this function explicitly uses "data_keys" and "E0s" fit_kwargs entries - should those be passed in explicitly? 
+        NOTE: this function explicitly uses "data_keys" and "E0s" fit_kwargs entries - should those be passed in explicitly?
             If so, should HAL add them to fit_kwargs, or should the caller?
     n_iters: int
         number of HAL iterations
@@ -52,7 +52,7 @@ def HAL(fit_configs, traj_configs, basis_source, solver, fit_kwargs, n_iters, re
     dt_fs: float
         time step (in fs) for dynamics (overridable in Atoms.info)
     tol: float
-        tolerance for triggering HAL in fractional force error. If negative, save first config that 
+        tolerance for triggering HAL in fractional force error. If negative, save first config that
         exceeds tol but continue trajectory to full traj_len (overridable in Atoms.info)
     tau_rel: float / tuple(float, float)
         strength of bias forces relative to unbiased forces, fixed or range for ramp (overridable in Atoms.info)
@@ -237,7 +237,7 @@ def HAL(fit_configs, traj_configs, basis_source, solver, fit_kwargs, n_iters, re
                 dyn.attach(hal_monitor)
                 if cell_mc is not None:
                     dyn.attach(cell_mc, interval=cell_step_interval)
-                
+
                 if swap_step_interval > 0:
                     swap_mc = SwapMC(traj_config, T_K_cur)
                     dyn.attach(swap_mc, interval=swap_step_interval)
@@ -267,7 +267,7 @@ def HAL(fit_configs, traj_configs, basis_source, solver, fit_kwargs, n_iters, re
         # If trajectory was triggered by HAL tolerance, config was not already written
         # and will be written here.  If trajectory completed normally and last config was
         # already set to be written according to traj_interval, it was already written and
-        # this call should know and not actually write it again. 
+        # this call should know and not actually write it again.
         hal_monitor.write_final_config(new_config)
 
         plot_traj_file = file_root.parent / (file_root.name + f".run_data.{HAL_label}.pdf")
@@ -279,49 +279,54 @@ def HAL(fit_configs, traj_configs, basis_source, solver, fit_kwargs, n_iters, re
               f" traj_len {traj_len}")
         sys.stdout.flush()
 
-        if ref_calc is not None:
-            t0 = time.time()
-            # do reference calculation
-            new_config.calc = ref_calc
-
-            data_keys = fit_kwargs['data_keys']
-            if 'E' in data_keys:
-                try:
-                    E = new_config.get_potential_energy(force_consistent=True)
-                except PropertyNotImplementedError:
-                    warnings.warn(f"No force_consistent=True energy found for new config with reference calculator {ref_calc}")
-                    E = new_config.get_potential_energy()
-                new_config.info[data_keys['E']] = E
-            if 'F' in data_keys:
-                F = new_config.get_forces()
-                new_config.new_array(data_keys['F'], F)
-            if 'V' in data_keys:
-                try:
-                    V = - new_config.get_volume() * new_config.get_stress(voigt=False)
-                    new_config.info[data_keys['V']] = V
-                except PropertyNotImplementedError:
-                    warnings.warn(f"No stress for new config with reference calculator {ref_calc}")
-            print("TIMING reference_calc", time.time() - t0)
-
-        # save new config to fit or test set
-        rv = np.random.uniform() 
-        if rv > test_fraction:
-            # fit config chosen
-            new_fit_configs.append(new_config)
-            new_config_file = file_root.parent / (file_root.name + f".config_fit.{HAL_label}.extxyz")
-
+        # jpd47 skip reference calculation and don't include configuration again if iter_HAL == 0
+        if iter_HAL > 0:
             if ref_calc is not None:
-                # cause a refit below, whether or not basis is re-optimized
-                committee_calc = None
+                t0 = time.time()
+                # do reference calculation
+                new_config.calc = ref_calc
+
+                data_keys = fit_kwargs['data_keys']
+                if 'E' in data_keys:
+                    try:
+                        E = new_config.get_potential_energy(force_consistent=True)
+                    except PropertyNotImplementedError:
+                        warnings.warn(f"No force_consistent=True energy found for new config with reference calculator {ref_calc}")
+                        E = new_config.get_potential_energy()
+                    new_config.info[data_keys['E']] = E
+                if 'F' in data_keys:
+                    F = new_config.get_forces()
+                    new_config.new_array(data_keys['F'], F)
+                if 'V' in data_keys:
+                    try:
+                        V = - new_config.get_volume() * new_config.get_stress(voigt=False)
+                        new_config.info[data_keys['V']] = V
+                    except PropertyNotImplementedError:
+                        warnings.warn(f"No stress for new config with reference calculator {ref_calc}")
+                print("TIMING reference_calc", time.time() - t0)
+
+            # save new config to fit or test set
+            rv = np.random.uniform()
+            if rv > test_fraction:
+                # fit config chosen
+                new_fit_configs.append(new_config)
+                new_config_file = file_root.parent / (file_root.name + f".config_fit.{HAL_label}.extxyz")
+
+                if ref_calc is not None:
+                    # cause a refit below, whether or not basis is re-optimized
+                    committee_calc = None
+            else:
+                # test config chosen, not need for refit
+                new_test_configs.append(new_config)
+                new_config_file = file_root.parent / (file_root.name + f".config_test.{HAL_label}.extxyz")
+
+            ase.io.write(new_config_file, new_config)
         else:
-            # test config chosen, not need for refit
-            new_test_configs.append(new_config)
-            new_config_file = file_root.parent / (file_root.name + f".config_test.{HAL_label}.extxyz")
+            print("skipping reference calculation becuase HAL_iter is {}".format(iter_HAL))
 
-        ase.io.write(new_config_file, new_config)
-
-        if (basis_optim_kwargs is not None and basis_optim_interval is not None and
-            iter_HAL % basis_optim_interval == basis_optim_interval - 1):
+        #reoptimise basis if iter_HAL == 0
+        if (iter_HAL == 0 or (basis_optim_kwargs is not None and basis_optim_interval is not None and
+            iter_HAL % basis_optim_interval == basis_optim_interval - 1)):
             t0 = time.time()
             # optimize basis
             basis_info = _optimize_basis(fit_configs + new_fit_configs, basis_source, solver, fit_kwargs,
