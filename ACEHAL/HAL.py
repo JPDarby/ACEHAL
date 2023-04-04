@@ -158,7 +158,8 @@ def HAL(fit_configs, traj_configs, basis_source, solver, fit_kwargs, n_iters, re
         HAL_label = _HAL_label(iter_HAL)
 
         # pick config to start trajectory from
-        traj_config = traj_configs[iter_HAL % len(traj_configs)].copy()
+        seed_ind = iter_HAL % len(traj_configs)
+        traj_config = traj_configs[seed_ind].copy()
 
         # set parameters for this run based on defaults, optionally overriden by traj_config.info["HAL_traj_params"]
         traj_params = default_traj_params.copy()
@@ -279,9 +280,13 @@ def HAL(fit_configs, traj_configs, basis_source, solver, fit_kwargs, n_iters, re
               f" traj_len {traj_len}")
         sys.stdout.flush()
 
+        HAL_step = new_config.info["HAL_step"]
+        print("jpd47 HAL_step is {}".format(HAL_step))
         # jpd47 skip reference calculation and don't include configuration again if iter_HAL == 0
-        if iter_HAL > 0:
-            if ref_calc is not None:
+        if ref_calc is not None:
+            if HAL_step == 0:
+                new_config = traj_configs[seed_ind].copy()
+            else:
                 t0 = time.time()
                 # do reference calculation
                 new_config.calc = ref_calc
@@ -305,6 +310,7 @@ def HAL(fit_configs, traj_configs, basis_source, solver, fit_kwargs, n_iters, re
                         warnings.warn(f"No stress for new config with reference calculator {ref_calc}")
                 print("TIMING reference_calc", time.time() - t0)
 
+
             # save new config to fit or test set
             rv = np.random.uniform()
             if rv > test_fraction:
@@ -324,9 +330,9 @@ def HAL(fit_configs, traj_configs, basis_source, solver, fit_kwargs, n_iters, re
         else:
             print("skipping reference calculation becuase HAL_iter is {}".format(iter_HAL))
 
-        #reoptimise basis if iter_HAL == 0
-        if (iter_HAL == 0 or (basis_optim_kwargs is not None and basis_optim_interval is not None and
-            iter_HAL % basis_optim_interval == basis_optim_interval - 1)):
+        #reoptimise basis if HAL_step == 0
+        if (basis_optim_kwargs is not None and basis_optim_interval is not None and
+            iter_HAL % basis_optim_interval == basis_optim_interval - 1):
             t0 = time.time()
             # optimize basis
             basis_info = _optimize_basis(fit_configs + new_fit_configs, basis_source, solver, fit_kwargs,

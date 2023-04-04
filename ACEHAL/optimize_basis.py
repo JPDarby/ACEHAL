@@ -1,7 +1,7 @@
 import numpy as np
 
-import optuna 
-from optuna.samplers import TPESampler
+import optuna
+from optuna.samplers import TPESampler, BruteForceSampler
 from optuna.study import MaxTrialsCallback
 from optuna.trial import TrialState
 
@@ -17,10 +17,10 @@ from .basis import define_basis
 from .fit import fit
 
 def basis_dependency_range_max(basis_kwargs, fixed_basis_info, optimize_params, max_basis_len, dependency_source, dependency_target):
-    """Make the max of range of optimization values of the dependency_target be dependent on the 
+    """Make the max of range of optimization values of the dependency_target be dependent on the
     value of the dependency_source so that the max basis length is not exceeded
 
-    Modifies optimize_params (keeping all other parameters at their minimum values) so that range 
+    Modifies optimize_params (keeping all other parameters at their minimum values) so that range
     maximum of dependency_target ensures that max basis length is not exceeded.
 
     Parameters
@@ -30,7 +30,7 @@ def basis_dependency_range_max(basis_kwargs, fixed_basis_info, optimize_params, 
     fixed_basis_info: dict
         parameters for basis_info that are not optimized
     optimize_params: dict
-        parameters that 
+        parameters that
     max_basis_len: int
         max basis length to allow
     dependency_source: str
@@ -183,14 +183,14 @@ def optimize(solver, fitting_db, n_trials, optimize_params, basis_kwargs, fit_kw
             included_c = solver.lambda_ < solver.threshold_lambda
             k = sum(included_c)
         else:
-            k = Psi.shape[1]    
+            k = Psi.shape[1]
 
         if score == "BIC":
             residuals = Psi @ coef - Y
             trial_score = n * np.log(np.mean(residuals ** 2)) + k * np.log(n)
         elif score == "AIC":
             residuals = Psi @ coef - Y
-            trial_score = n * np.log(np.mean(residuals ** 2)) + 2 * k 
+            trial_score = n * np.log(np.mean(residuals ** 2)) + 2 * k
         elif score == "AICc":
             residuals = Psi @ coef - Y
             if n - k - 1 <= 0:
@@ -203,18 +203,23 @@ def optimize(solver, fitting_db, n_trials, optimize_params, basis_kwargs, fit_kw
 
         return trial_score
 
-    study = optuna.create_study(sampler=TPESampler(seed=seed), direction='minimize')
 
-    for guess in addl_guesses:
-        guess_dict = guess.copy()
-        for k in fixed_basis_info.keys():
-            del guess_dict[k]
-        study.enqueue_trial(guess_dict)
+    # study = optuna.create_study(sampler=TPESampler(seed=seed), direction='minimize')
 
-    study.optimize(objective,
-                   callbacks=[MaxTrialsCallback(n_trials, states=(TrialState.COMPLETE,)),
-                              StopWhenTrialKeepFailingCallback(n_trials * 2)],
-                   catch=(TimeoutError, BasisTooLarge))
+    # for guess in addl_guesses:
+    #     guess_dict = guess.copy()
+    #     for k in fixed_basis_info.keys():
+    #         del guess_dict[k]
+    #     study.enqueue_trial(guess_dict)
+
+    # study.optimize(objective,
+    #                callbacks=[MaxTrialsCallback(n_trials, states=(TrialState.COMPLETE,)),
+    #                           StopWhenTrialKeepFailingCallback(n_trials * 2)],
+    #                catch=(TimeoutError, BasisTooLarge))
+
+
+    study = optuna.create_study(sampler=BruteForceSampler(), direction='minimize')
+    study.optimize(objective, catch=(TimeoutError, BasisTooLarge))
 
     basis_info = fixed_basis_info.copy()
     basis_info.update(study.best_params)
