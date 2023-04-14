@@ -15,6 +15,7 @@ convert = Main.eval("julip_at(a) = JuLIP.Atoms(a)")
 ASEAtoms = Main.eval("ASEAtoms(a) = ASE.ASEAtoms(a)")
 
 from .ace_committee_calc import ACECommittee
+from bayes_regress_max import BayesianRegressionMax
 
 
 def fit(atoms_list, solver, B_len_norm, E0s, data_keys, weights, Fmax=None, n_committee=8,
@@ -297,6 +298,26 @@ def do_fit(Psi, Y, B, E0s, solver, n_committee=8, basis_normalization=None, pot_
 
     solver.fit(Psi_norm, Y)
 
+
+    #optimise the threshold here + code it in this way so that you don't include the BRM code in the HAL fork
+    #if isinstance(solver, BayesianRegressionMax):
+    if str(type(solver)) == "<class 'bayes_regress_max.BayesianRegressionMax'>":
+        print("jpd47 setting ARD threshold using the BIC score")
+        n, K = Psi.shape
+        history = []
+        for threshold in np.logspace(0, 4, 40):
+            solver.reset_threshold(threshold)
+            coef_t = np.array(solver.coef_)
+            residuals_t = Psi@coef_t-Y
+            K = np.sum(abs(coef_t) > 1e-15)
+            BIC = n * np.log(np.mean(residuals_t ** 2)) + K * np.log(n)
+            history.append([threshold, BIC, K])
+        history = sorted(history, key = lambda x: x[1])
+
+        best_threshold, score, best_K = history[0]
+        print("jpd47 Psi.shape is {} but only using {} basis functions based on BIC chosen threshold".forma(Psi.shape, best_K))
+        solver.reset_threshold(best_threshold)
+
     c_norm = solver.coef_
 
     # undo normalization in coefficients, so users of solver outside this function will
@@ -322,7 +343,15 @@ def do_fit(Psi, Y, B, E0s, solver, n_committee=8, basis_normalization=None, pot_
         # indicate which ones those are.
         if sigma.shape[0] != len(c_norm):
              # only valid for sklearn ARDRegression
-            included_c = solver.lambda_ < solver.threshold_lambda
+
+             #Skelarn ARD
+            if "threshold_lambda" in solver.__dict__:
+                threshold_lambda = solver.threshold_lambda
+                included_c = solver.lambda_ < solver.threshold_lambda
+            #BRM from Noam and Chucks
+            else:
+                included_c = abs(solver.coef_) > 1e-15
+
             assert sigma.shape[0] == sum(included_c)
 
             sigma_full = np.zeros((len(c_norm), len(c_norm)), dtype=sigma.dtype)
