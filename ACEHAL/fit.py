@@ -30,7 +30,7 @@ def fit(atoms_list, solver, B_len_norm, E0s, data_keys, weights, Fmax=None, n_co
         solvers for the linear problem
     B_len_norm: (julia basis object, int, array(float) / None)
         3-tuple representing basis to use, as returned by ACEHAL.basis.define_basis,
-        consisting of basis object, integer length (ignored), and optional array with 
+        consisting of basis object, integer length (ignored), and optional array with
         normalization factors.
     E0s: dict{str: float}
         dict of atomic energies for each species
@@ -60,7 +60,7 @@ def fit(atoms_list, solver, B_len_norm, E0s, data_keys, weights, Fmax=None, n_co
     -------
     ACECommittee fit calculator with optional committee
     iff return_linear_problem is True:
-        Psi, Y, coef: numpy array(float) design matrix, RHS and coefficients 
+        Psi, Y, coef: numpy array(float) design matrix, RHS and coefficients
         prop_row_inds: dict('E' / 'F' / 'V': list(int)) with indices of Psi and Y rows corresponding to each type of property
     """
     Psi, Y, prop_row_inds = assemble_Psi_Y(atoms_list, B_len_norm[0], E0s, data_keys, weights, Fmax=Fmax)
@@ -82,8 +82,8 @@ def fit(atoms_list, solver, B_len_norm, E0s, data_keys, weights, Fmax=None, n_co
 
     if data_save_label is not None:
         args = {'file': data_save_label + ".Psi.npz",
-                'Psi': Psi, 
-                'Y': Y, 
+                'Psi': Psi,
+                'Y': Y,
                 'c': coef}
         try:
             args['sigma'] = solver.sigma_
@@ -213,7 +213,7 @@ def _Psi_Y_section(at, B, E0s, data_keys, weights, Fmax=None):
     return Psi, Y, prop_row_inds
 
 
-def assemble_Psi_Y(ats, B, E0s, data_keys, weights, Fmax=None):
+def assemble_Psi_Y(ats, B, E0s, data_keys, weights, Fmax=None, verbose=False):
     """Assemble the entire design matrix, right hand side, and indices of E, F, V related rows
 
     Parameters
@@ -245,7 +245,9 @@ def assemble_Psi_Y(ats, B, E0s, data_keys, weights, Fmax=None):
     Y = []
     prop_row_inds = {'E': [], 'F': [], 'V': []}
     last_Y_len = 0
-    for at in ats:
+    for j, at in enumerate(ats):
+        if verbose:
+            print("\r", j, "\"", len(ats), end="")
         Psi_sec, Y_sec, prop_row_inds_sec = _Psi_Y_section(at, B, E0s, data_keys, weights, Fmax=Fmax)
         Psi.extend(Psi_sec)
         Y.extend(Y_sec)
@@ -280,7 +282,7 @@ def do_fit(Psi, Y, B, E0s, solver, n_committee=8, basis_normalization=None, pot_
 
     Returns
     -------
-    model ACECommittee 
+    model ACECommittee
     c coefficients vector
     """
     if verbose:

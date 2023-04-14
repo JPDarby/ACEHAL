@@ -131,6 +131,9 @@ def HAL(fit_configs, traj_configs, basis_source, solver, fit_kwargs, n_iters, re
         B_len_norm = define_basis(default_basis_info, basis_source)
     elif basis_optim_kwargs is not None:
         t0 = time.time()
+        # rows = len(fit_configs)* 7 + 3*sum([len(s) for s in fit_configs])
+        # print("jpd47 rows is {}".format(rows))
+        # basis_optim_kwargs["max_basis_len"] = rows
         basis_info = _optimize_basis(fit_configs, basis_source, solver, fit_kwargs, basis_optim_kwargs)
         B_len_norm = define_basis(basis_info, basis_source)
         print("TIMING initial_basis_optim", time.time() - t0)
@@ -333,6 +336,9 @@ def HAL(fit_configs, traj_configs, basis_source, solver, fit_kwargs, n_iters, re
         #reoptimise basis if HAL_step == 0
         if (basis_optim_kwargs is not None and basis_optim_interval is not None and
             iter_HAL % basis_optim_interval == basis_optim_interval - 1):
+            # rows = len(fit_configs + new_fit_configs)* 7 + 3*sum([len(s) for s in fit_configs + new_fit_configs])
+            # print("jpd47 rows is {}".format(rows))
+            # basis_optim_kwargs["max_basis_len"] = rows
             t0 = time.time()
             # optimize basis
             basis_info = _optimize_basis(fit_configs + new_fit_configs, basis_source, solver, fit_kwargs,

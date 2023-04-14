@@ -198,6 +198,9 @@ def optimize(solver, fitting_db, n_trials, optimize_params, basis_kwargs, fit_kw
             trial_score = n * np.log(np.mean(residuals ** 2)) + 2 * k + (2 * k ** 2 + 2 * k) / (n - k - 1)
         elif score == "solver_internal":
             trial_score = - solver.scores_[-1]
+        elif score == "residuals":
+            residuals= Psi @ coef - Y
+            trial_score = np.mean(residuals**2)
         else:
             raise ValueError(f"Unknown score method {score}")
 
