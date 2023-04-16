@@ -315,7 +315,7 @@ def do_fit(Psi, Y, B, E0s, solver, n_committee=8, basis_normalization=None, pot_
         history = sorted(history, key = lambda x: x[1])
 
         best_threshold, score, best_K = history[0]
-        print("jpd47 Psi.shape is {} but only using {} basis functions based on BIC chosen threshold".forma(Psi.shape, best_K))
+        print("jpd47 Psi.shape is {} but only using {} basis functions based on BIC chosen threshold".format(Psi.shape, best_K))
         solver.reset_threshold(best_threshold)
 
     c_norm = solver.coef_

@@ -11,7 +11,7 @@ def define_basis(basis_info, julia_source=None):
     f"""define an ACE basis using julia
 
     Runs julia source code that defines B, len_B and P_diag julia variables containing
-    the basis, its length, and an optional normalization vector.  Parameters 
+    the basis, its length, and an optional normalization vector.  Parameters
     will be passed into julia as a dict named "basis_info".  Julia code must define
     "B" for the basis, "B_len" for its length, and "P_diag" vector of the same
     lenth for an optional basis normalization.
@@ -49,4 +49,23 @@ def define_basis(basis_info, julia_source=None):
 
     Main.eval(julia_source)
 
-    return Main.B, Main.B_length, Main.P_diag
+
+    #jpd47 return an array
+    #pair basis, Nones for species atm
+    znl_data = []
+    for i, Zi in enumerate(Main.ace_Zs):
+        for Z2 in Main.ace_Zs[i:]:
+            for n in range(1, basis_info["maxdeg"]+1):
+                znl_data.append({"z0":None, "zs":None, "ns":[n], "ls":[0], "nu":1})
+    #add main ace basis data
+    Nz = len(Main.ace_Zs)
+    N = len(Main.znl_data)//Nz
+    for i, bb in enumerate(Main.znl_data):
+        bdic = {"z0":Main.ace_Zs[i//N], "zs":[], "ns":[], "ls":[], "nu":len(bb)}
+        for b in bb:
+            bdic["zs"].append(b[0])
+            bdic["ns"].append(b[1])
+            bdic["ls"].append(b[2])
+        znl_data.append(bdic)
+
+    return Main.B, Main.B_length, Main.P_diag, znl_data
