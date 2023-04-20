@@ -259,7 +259,7 @@ def assemble_Psi_Y(ats, B, E0s, data_keys, weights, Fmax=None, verbose=False):
     return np.asarray(Psi), np.asarray(Y), prop_row_inds
 
 
-def do_fit(Psi, Y, B, E0s, solver, n_committee=8, basis_normalization=None, pot_file=None, rng=None, verbose=False):
+def do_fit(Psi, Y, B, E0s, solver, n_committee=8, basis_normalization=None, pot_file=None, rng=None, verbose=False, refit=True):
     """fit an ACE committee model to a design matrix and RHS
 
     Parameters
@@ -296,12 +296,13 @@ def do_fit(Psi, Y, B, E0s, solver, n_committee=8, basis_normalization=None, pot_
     else:
         Psi_norm = Psi
 
-    solver.fit(Psi_norm, Y)
+    if refit:
+        solver.fit(Psi_norm, Y)
 
 
     #optimise the threshold here + code it in this way so that you don't include the BRM code in the HAL fork
     #if isinstance(solver, BayesianRegressionMax):
-    if str(type(solver)) == "<class 'bayes_regress_max.BayesianRegressionMax'>":
+    if str(type(solver)) == "<class 'bayes_regress_max.BayesianRegressionMax'>" and solver.method == "ARD":
         print("jpd47 setting ARD threshold using the BIC score")
         n, K = Psi.shape
         history = []

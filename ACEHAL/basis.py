@@ -31,7 +31,7 @@ def define_basis(basis_info, julia_source=None):
     B_length int: length of basis
     normalization: numpy array(n_basis) or None normalization needed, e.g. to enforce smoothness prior
     """
-
+    print("basis_info is", basis_info)
     if julia_source is None:
         julia_source = _default_mod
 
@@ -53,9 +53,13 @@ def define_basis(basis_info, julia_source=None):
     #jpd47 return an array
     #pair basis, Nones for species atm
     znl_data = []
+    if type(basis_info["maxdeg"]) == int:
+        Nmax = basis_info["maxdeg"]
+    elif type(basis_info["maxdeg"]) == dict:
+        Nmax = basis_info["maxdeg"][1]
     for i, Zi in enumerate(Main.ace_Zs):
         for Z2 in Main.ace_Zs[i:]:
-            for n in range(1, basis_info["maxdeg"]+1):
+            for n in range(1, Nmax+1):
                 znl_data.append({"z0":None, "zs":None, "ns":[n], "ls":[0], "nu":1})
     #add main ace basis data
     Nz = len(Main.ace_Zs)

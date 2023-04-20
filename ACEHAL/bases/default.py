@@ -1,17 +1,31 @@
-params = ["elements", "cor_order", "maxdeg", "r_cut", "smoothness_prior"]
+params = ["elements", "cor_order", "maxdeg", "r_cut", "smoothness_prior", "radial_transform"]
 
 source = """using ACE1x
+
+
 
             elements = basis_info["elements"]
             cor_order = basis_info["cor_order"]
             maxdeg = basis_info["maxdeg"]
             r_cut = basis_info["r_cut"]
             smoothness_prior_param = basis_info["smoothness_prior"]
+            radial_transform = basis_info["radial_transform"]
 
-            B = ACE1x.ace_basis(elements = Symbol.(elements),
-                        order = cor_order,
-                        totaldegree = maxdeg,
-                        rcut = r_cut)
+            if isnothing(radial_transform)
+                B = ACE1x.ace_basis(elements = Symbol.(elements),
+                    order = cor_order,
+                    totaldegree = maxdeg,
+                    rcut = r_cut)
+            elseif radial_transform == "Identity"
+                B = ACE1x.ace_basis(elements = Symbol.(elements),
+                    order = cor_order,
+                    totaldegree = maxdeg,
+                    rcut = r_cut,
+                    transform = IdTransform(),
+                    pair_transform = IdTransform())
+                println("using IdTransform() for radial")
+            end
+
 
             B_length = length(B)
             if isnothing(smoothness_prior_param)
