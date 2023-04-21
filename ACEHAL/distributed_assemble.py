@@ -45,7 +45,7 @@ def get_Psi(dataset, B, data_keys, weights, E0s):
 
     Psi = Main.A
     Y = Main.Y
-    Psi_w, Y_w = apply_weights(Psi, Y, dataset, data_keys, weights)
+    Psi_w, Y_w = apply_weights(Psi, Y, dataset, data_keys, weights, E0s)
     return Psi_w, Y_w
 
 def apply_weights(Psi_dist, Y_dist, configs, data_keys, weights, E0s):
