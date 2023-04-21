@@ -18,7 +18,7 @@ addprocs(Ncores)
 #Main.eval("using ACE1x")
 Main.eval("using ACE1pack")
 
-def get_Psi(dataset, B, data_keys, weights):
+def get_Psi(dataset, B, data_keys, weights, E0s):
     """writes the dataset to be read in by julia to avoid missing data"""
     dataset_name = os.getcwd() + "/DA_temp.extxyz"
     print("dataset_name is", dataset_name)
@@ -48,7 +48,7 @@ def get_Psi(dataset, B, data_keys, weights):
     Psi_w, Y_w = apply_weights(Psi, Y, dataset, data_keys, weights)
     return Psi_w, Y_w
 
-def apply_weights(Psi_dist, Y_dist, configs, data_keys, weights):
+def apply_weights(Psi_dist, Y_dist, configs, data_keys, weights, E0s):
     #shuffle this into distributed_assemble
     i = 0
     for at in configs:
@@ -57,7 +57,7 @@ def apply_weights(Psi_dist, Y_dist, configs, data_keys, weights):
         #energy
         if data_keys["E"] in at.info:
             Psi_dist[i, :] *= weights["E_per_atom"]/n
-            Y_dist[i] *= weights["E_per_atom"]/n
+            Y_dist[i] = weights["E_per_atom"]/n * (at.info[data_keys["E"]] - np.sum([at.symbols.count(sym) * E0 for sym, E0 in E0s.items()]))
             i += 1
 
         #forces
