@@ -4,7 +4,6 @@ print("using {} cores for assembling Psi".format(Ncores))
 
 import importlib
 from ase.io import read, write
-from basis import define_basis
 
 #load Julia and Python dependencies
 from julia.api import Julia
@@ -19,7 +18,7 @@ addprocs(Ncores)
 #Main.eval("using ACE1x")
 Main.eval("using ACE1pack")
 
-def get_Psi(dataset, B, data_keys):
+def get_Psi(dataset, B, data_keys, weights):
     """writes the dataset to be read in by julia to avoid missing data"""
     dataset_name = os.getcwd() + "/DA_temp.extxyz"
     print("dataset_name is", dataset_name)
@@ -29,7 +28,7 @@ def get_Psi(dataset, B, data_keys):
     Main.energy_key = data_keys["E"]
     Main.force_key = data_keys["F"]
     Main.virial_key = data_keys["V"]
-    Main.weights = {"default": {"E":1.0, "F": 1.0, "V":1.0}}
+    Main.weights = {"default": {"E":1.0, "F": 1.0, "V": 1.0}}
     Main.basis = B
 
     print("reading in data")
@@ -43,24 +42,30 @@ def get_Psi(dataset, B, data_keys):
 
     #remove temporary file to tidy up
     os.remove(dataset_name)
-    return Main.A, Main.Y, Main.W
 
-# #Get the basis from basis.py
-# E0s = { "Fe" : 1.0, "Ni" : 1.0, "Cr" : 1.0 }
-# fixed_basis_info = {"elements": list(E0s.keys()), "smoothness_prior" : None,  "r_cut": 5.5, "maxdeg": 14, "cor_order":2, "radial_transform":None}
-# B_len_norm_znl = define_basis(fixed_basis_info)
-# for x in B_len_norm_znl:
-#     print(type(x))
+    Psi = Main.A
+    Y = Main.Y
+    Psi_w, Y_w = apply_weights(Psi_dist, Y_dist, dataset, weights)
+    return Psi_w, Y_w
 
-# data_keys = { "E" : "energy", "F" : "forces", "V" : "virial", "Fmax" : 10.0 }
-# #dataset = read("/data/jpd47/FeNiCr/Lakshmi_orig/data_test.xyz", index=":")
-# dataset_name = "/data/jpd47/FeNiCr/Lakshmi_orig/data_test.xyz"
-# Psi, Y, W = get_Psi(dataset_name, B_len_norm_znl[0], data_keys)
-# print(type(Psi), type(Y), type(W))
-# print(Psi.shape, Y.shape, W.shape)
-# print(Psi[:,0])
+def apply_weights(Psi_dist, Y_dist, configs, weights):
+    #shuffle this into distributed_assemble
+    i = 0
+    for at in configs:
+        n = len(at)
 
+        #energy
+        Psi_dist[i, :] *= weights["E_per_atom"]/n
+        Y_dist[i] *= weights["E_per_atom"]/n
+        i += 1
 
-# # fixed_basis_info = {"E0s":E0s, "smoothness_prior" : None,  "r_cut": 5.5, "maxdeg": 5, "cor_order":2, "radial_transform":None}
-# #
-# # Psi = get_Psi(dataset, fixed_basis_info, data_keys)
+        #forces
+        Psi_dist[i:i+3*n,:] *= weights["F"]
+        Y_dist[i:i+3*n] *= weights["F"]
+        i += 3*n
+
+        #virials
+        Psi_dist[i:i+6, :] *= weights["V_per_atom"]/n
+        Y_dist[i:i+6] *= weights["V_per_atom"]/n
+        i += 6
+    return Psi_dist, Y_dist
