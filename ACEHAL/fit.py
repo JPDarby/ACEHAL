@@ -15,8 +15,6 @@ convert = Main.eval("julip_at(a) = JuLIP.Atoms(a)")
 ASEAtoms = Main.eval("ASEAtoms(a) = ASE.ASEAtoms(a)")
 
 from .ace_committee_calc import ACECommittee
-from bayes_regress_max import BayesianRegressionMax
-
 
 def fit(atoms_list, solver, B_len_norm, E0s, data_keys, weights, Fmax=None, n_committee=8,
         rng=None, pot_file=None, data_save_label=None, return_linear_problem=False, report_errors=True,
