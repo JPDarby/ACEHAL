@@ -7,7 +7,7 @@ from ase.io import read, write
 
 #load Julia and Python dependencies
 from julia.api import Julia
-jl = Julia(compiled_modules=False)
+jl = Julia(compiled_modules=True)
 from julia import Main
 
 #set number of julia processes to use
@@ -45,27 +45,30 @@ def get_Psi(dataset, B, data_keys, weights):
 
     Psi = Main.A
     Y = Main.Y
-    Psi_w, Y_w = apply_weights(Psi_dist, Y_dist, dataset, weights)
+    Psi_w, Y_w = apply_weights(Psi, Y, dataset, data_keys, weights)
     return Psi_w, Y_w
 
-def apply_weights(Psi_dist, Y_dist, configs, weights):
+def apply_weights(Psi_dist, Y_dist, configs, data_keys, weights):
     #shuffle this into distributed_assemble
     i = 0
     for at in configs:
         n = len(at)
 
         #energy
-        Psi_dist[i, :] *= weights["E_per_atom"]/n
-        Y_dist[i] *= weights["E_per_atom"]/n
-        i += 1
+        if data_keys["E"] in at.info:
+            Psi_dist[i, :] *= weights["E_per_atom"]/n
+            Y_dist[i] *= weights["E_per_atom"]/n
+            i += 1
 
         #forces
-        Psi_dist[i:i+3*n,:] *= weights["F"]
-        Y_dist[i:i+3*n] *= weights["F"]
-        i += 3*n
+        if data_keys["F"] in at.arrays:
+            Psi_dist[i:i+3*n,:] *= weights["F"]
+            Y_dist[i:i+3*n] *= weights["F"]
+            i += 3*n
 
         #virials
-        Psi_dist[i:i+6, :] *= weights["V_per_atom"]/n
-        Y_dist[i:i+6] *= weights["V_per_atom"]/n
-        i += 6
+        if data_keys["V"] in at.info:
+            Psi_dist[i:i+6, :] *= weights["V_per_atom"]/n
+            Y_dist[i:i+6] *= weights["V_per_atom"]/n
+            i += 6
     return Psi_dist, Y_dist
