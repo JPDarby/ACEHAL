@@ -257,7 +257,7 @@ def assemble_Psi_Y(ats, B, E0s, data_keys, weights, Fmax=None, verbose=False):
     return np.asarray(Psi), np.asarray(Y), prop_row_inds
 
 
-def do_fit(Psi, Y, B, E0s, solver, n_committee=8, basis_normalization=None, pot_file=None, rng=None, verbose=False, refit=True):
+def do_fit(Psi, Y, B, E0s, solver, n_committee=8, basis_normalization=None, pot_file=None, rng=None, verbose=False, refit=True, filter_tol=1e-10):
     """fit an ACE committee model to a design matrix and RHS
 
     Parameters
@@ -294,23 +294,38 @@ def do_fit(Psi, Y, B, E0s, solver, n_committee=8, basis_normalization=None, pot_
     else:
         Psi_norm = Psi
 
+
+    #jpd47 ignore features with tiny variance e.g. H-H 2b if you only have 1 H atom
+    active_locs = np.std(Psi_norm, axis=0) > filter_tol
+    Psi_norm_active = Psi_norm[:, active_locs]
+    if basis_normalization is not None:
+        basis_normalization_active = basis_normalization[active_locs]
+    print("shape of Psi_norm_active is {}".format(Psi_norm_active.shape))
+    if type(solver.var_c_0) != float:
+        solver.var_c_0 = solver.var_c_0[active_locs]
+
     if refit:
-        solver.fit(Psi_norm, Y)
+        solver.fit(Psi_norm_active, Y)
 
 
     #optimise the threshold here + code it in this way so that you don't include the BRM code in the HAL fork
     #if isinstance(solver, BayesianRegressionMax):
     if str(type(solver)) == "<class 'bayes_regress_max.BayesianRegressionMax'>" and solver.method == "ARD":
         print("jpd47 setting ARD threshold using the BIC score")
-        n, K = Psi.shape
+        n, K = Psi_norm_active.shape
         history = []
         for threshold in np.logspace(0, 4, 40):
-            solver.reset_threshold(threshold)
-            coef_t = np.array(solver.coef_)
-            residuals_t = Psi@coef_t-Y
-            K = np.sum(abs(coef_t) > 1e-15)
-            BIC = n * np.log(np.mean(residuals_t ** 2)) + K * np.log(n)
-            history.append([threshold, BIC, K])
+            try:
+                solver.reset_threshold(threshold)
+                coef_t = np.array(solver.coef_)
+                residuals_t = Psi_norm_active@coef_t-Y
+                #K = np.sum(abs(coef_t) > 1e-15)
+                K = np.sum(solver.var_c_ > (solver.var_c_min * solver.threshold))
+                BIC = n * np.log(np.mean(residuals_t ** 2)) + K * np.log(n)
+                print(threshold, K, BIC)
+                history.append([threshold, BIC, K])
+            except:
+                pass
         history = sorted(history, key = lambda x: x[1])
 
         best_threshold, score, best_K = history[0]
@@ -322,7 +337,7 @@ def do_fit(Psi, Y, B, E0s, solver, n_committee=8, basis_normalization=None, pot_
     # undo normalization in coefficients, so users of solver outside this function will
     # get consistent ones
     if basis_normalization is not None:
-        c = solver.coef_ / basis_normalization
+        c = solver.coef_ / basis_normalization_active
     else:
         c = solver.coef_
 
@@ -349,8 +364,9 @@ def do_fit(Psi, Y, B, E0s, solver, n_committee=8, basis_normalization=None, pot_
                 included_c = solver.lambda_ < solver.threshold_lambda
             #BRM from Noam and Chucks
             else:
-                included_c = abs(solver.coef_) > 1e-15
-
+                #included_c = abs(solver.coef_) > 1e-15
+                included_c = solver.var_c_ > (solver.var_c_min * solver.threshold)
+            print("jpd47 assert: sigma.shape[0], sum(included_c)")
             assert sigma.shape[0] == sum(included_c)
 
             sigma_full = np.zeros((len(c_norm), len(c_norm)), dtype=sigma.dtype)
@@ -372,9 +388,18 @@ def do_fit(Psi, Y, B, E0s, solver, n_committee=8, basis_normalization=None, pot_
 
         if basis_normalization is not None:
             # also undo normalization on committee coefficients
-            comms /= basis_normalization
+            comms /= basis_normalization_active
     else:
         comms = None
+
+    #jpd47 Now undo the filter e.g. extend c with zeros
+    c_new = np.zeros(len(active_locs))
+    c_new[active_locs] += c
+    c = c_new
+    if comms is not None:
+         comms_new = np.zeros(shape=(n_committee, len(active_locs)))
+         comms_new[:, active_locs] += comms
+         comms = comms_new
 
     Main.E0s = E0s
     Main.ref_pot = Main.eval("refpot = OneBody(" + "".join([" :{} => {}, ".format(key, value) for key, value in E0s.items()]) + ")")

@@ -4,10 +4,11 @@ print("using {} cores for assembling Psi".format(Ncores))
 
 import importlib
 from ase.io import read, write
+import numpy as np
 
 #load Julia and Python dependencies
 from julia.api import Julia
-jl = Julia(compiled_modules=True)
+jl = Julia(compiled_modules=False)
 from julia import Main
 
 #set number of julia processes to use

@@ -24,7 +24,7 @@ def HAL(fit_configs, traj_configs, basis_source, solver, fit_kwargs, n_iters, re
          traj_len, dt_fs, tol, tau_rel, T_K, P_GPa=None, cell_fixed_shape=False, T_timescale_fs=100, tol_eps=0.1, tau_hist=100,
          cell_step_interval=10, swap_step_interval=0, cell_step_mag=0.01,
          default_basis_info=None, basis_optim_kwargs=None, basis_optim_interval=None,
-         file_root=None, traj_interval=10, test_configs=[], test_fraction=0.0):
+         file_root=None, traj_interval=10, test_configs=[], test_fraction=0.0, atom_sigma=0.0):
     """Iterate with hyperactive learning
 
     Parameters
@@ -144,6 +144,17 @@ def HAL(fit_configs, traj_configs, basis_source, solver, fit_kwargs, n_iters, re
 
     # initial fit
     t0 = time.time()
+
+    #jpd47 apply broadening
+    print("jpd47, updating solver var_c_0 to use gaussian broadening prior")
+    r_nn = 2.5
+    r_cut = 5.5
+    a_n = (atom_sigma/r_cut)**2
+    a_l = (atom_sigma/(5*r_nn))**2
+    znl = B_len_norm[-1]
+    gauss_norm = np.array([np.exp(a_n*sum([n**2 for n in d["ns"]]) + a_l*sum([l**2 for l in d["ls"]])) for d in znl])
+    solver.var_c_0=np.array(gauss_norm)**-1
+
     committee_calc = _fit(fit_configs, solver, fit_kwargs, B_len_norm, file_root, _HAL_label(0))
     print("TIMING initial_fit", time.time() - t0)
     error_configs = [("fit", fit_configs)]
@@ -353,6 +364,7 @@ def HAL(fit_configs, traj_configs, basis_source, solver, fit_kwargs, n_iters, re
             t0 = time.time()
             # re-fit (whether because of new config or new basis or both)
             # label potential with next iteration, since that's when it will be used
+
             committee_calc = _fit(fit_configs + new_fit_configs, solver, fit_kwargs, B_len_norm, file_root, _HAL_label(iter_HAL + 1))
             error_configs = [("fit", fit_configs + new_fit_configs)]
             if len(test_configs + new_test_configs) > 0 or test_fraction > 0:
