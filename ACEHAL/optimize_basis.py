@@ -182,9 +182,12 @@ def optimize(solver, fitting_db, n_trials, optimize_params, basis_kwargs, fit_kw
         if sklearn_ARDRegression is not None and isinstance(solver, sklearn_ARDRegression):
             included_c = solver.lambda_ < solver.threshold_lambda
             k = sum(included_c)
+        elif str(type(solver)) == "<class 'bayes_regress_max.BayesianRegressionMax'>" and solver.method == "ARD":
+            k = np.sum(solver.var_c_ > (solver.var_c_min * solver.threshold))
         else:
             k = Psi.shape[1]
 
+        print("jpd47 k is {} and Psi.shape is {}".format(k, Psi.shape))
         if score == "BIC":
             residuals = Psi @ coef - Y
             trial_score = n * np.log(np.mean(residuals ** 2)) + k * np.log(n)
