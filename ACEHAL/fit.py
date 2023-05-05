@@ -301,8 +301,8 @@ def do_fit(Psi, Y, B, E0s, solver, n_committee=8, basis_normalization=None, pot_
     if basis_normalization is not None:
         basis_normalization_active = basis_normalization[active_locs]
     print("shape of Psi_norm_active is {}".format(Psi_norm_active.shape))
-    if type(solver.var_c_0) != float:
-        solver.var_c_0 = solver.var_c_0[active_locs]
+    #if type(solver.var_c_0) != float:
+    #    solver.var_c_0 = solver.var_c_0[active_locs]
 
     if refit:
         solver.fit(Psi_norm_active, Y)

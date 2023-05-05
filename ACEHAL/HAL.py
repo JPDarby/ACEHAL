@@ -131,9 +131,6 @@ def HAL(fit_configs, traj_configs, basis_source, solver, fit_kwargs, n_iters, re
         B_len_norm = define_basis(default_basis_info, basis_source)
     elif basis_optim_kwargs is not None:
         t0 = time.time()
-        # rows = len(fit_configs)* 7 + 3*sum([len(s) for s in fit_configs])
-        # print("jpd47 rows is {}".format(rows))
-        # basis_optim_kwargs["max_basis_len"] = rows
         basis_info = _optimize_basis(fit_configs, basis_source, solver, fit_kwargs, basis_optim_kwargs)
         B_len_norm = define_basis(basis_info, basis_source)
         print("TIMING initial_basis_optim", time.time() - t0)
@@ -145,15 +142,7 @@ def HAL(fit_configs, traj_configs, basis_source, solver, fit_kwargs, n_iters, re
     # initial fit
     t0 = time.time()
 
-    #jpd47 apply broadening
-    print("jpd47, updating solver var_c_0 to use gaussian broadening prior")
-    r_nn = 2.5
-    r_cut = 5.5
-    a_n = (atom_sigma/r_cut)**2
-    a_l = (atom_sigma/(5*r_nn))**2
-    znl = B_len_norm[-1]
-    gauss_norm = np.array([np.exp(a_n*sum([n**2 for n in d["ns"]]) + a_l*sum([l**2 for l in d["ls"]])) for d in znl])
-    solver.var_c_0=np.array(gauss_norm)**-1
+
 
     committee_calc = _fit(fit_configs, solver, fit_kwargs, B_len_norm, file_root, _HAL_label(0))
     print("TIMING initial_fit", time.time() - t0)
@@ -352,9 +341,12 @@ def HAL(fit_configs, traj_configs, basis_source, solver, fit_kwargs, n_iters, re
             # basis_optim_kwargs["max_basis_len"] = rows
             t0 = time.time()
             # optimize basis
+
+            #modify this to pass the current basis as well -only check degrees either side of this one.
             basis_info = _optimize_basis(fit_configs + new_fit_configs, basis_source, solver, fit_kwargs,
                                          basis_optim_kwargs)
             print("HAL got optimized basis", basis_info)
+
             B_len_norm = define_basis(basis_info, basis_source)
             # reset calculator to trigger a it with the new basis based on the optimized basis_info
             committee_calc = None
@@ -364,6 +356,18 @@ def HAL(fit_configs, traj_configs, basis_source, solver, fit_kwargs, n_iters, re
             t0 = time.time()
             # re-fit (whether because of new config or new basis or both)
             # label potential with next iteration, since that's when it will be used
+
+            #jpd47 apply broadening
+            if atom_sigma > 0:
+                print("overriding basis normalisation using gaussian broadening with atom_sigma={}".format(atom_sigma))
+                r_nn = 2.5
+                r_cut = 5.5
+                a_n = (atom_sigma/r_cut)**2
+                a_l = (atom_sigma/(5*r_nn))**2
+                znl = B_len_norm[-1]
+                gauss_norm = np.array([np.exp(a_n*sum([n**2 for n in d["ns"]]) + a_l*sum([l**2 for l in d["ls"]])) for d in znl])
+                B_len_norm[2] = gauss_norm
+                #solver.var_c_0=np.array(gauss_norm)**-1
 
             committee_calc = _fit(fit_configs + new_fit_configs, solver, fit_kwargs, B_len_norm, file_root, _HAL_label(iter_HAL + 1))
             error_configs = [("fit", fit_configs + new_fit_configs)]
