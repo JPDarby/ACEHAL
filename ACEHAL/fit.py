@@ -314,7 +314,7 @@ def do_fit(Psi, Y, B, E0s, solver, n_committee=8, basis_normalization=None, pot_
         print("jpd47 setting ARD threshold using the BIC score")
         n, K = Psi_norm_active.shape
         history = []
-        for threshold in np.logspace(0, 4, 40):
+        for threshold in np.logspace(0, 4, 80):
             try:
                 solver.reset_threshold(threshold)
                 coef_t = np.array(solver.coef_)

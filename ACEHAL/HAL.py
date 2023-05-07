@@ -163,6 +163,7 @@ def HAL(fit_configs, traj_configs, basis_source, solver, fit_kwargs, n_iters, re
         # pick config to start trajectory from
         seed_ind = iter_HAL % len(traj_configs)
         traj_config = traj_configs[seed_ind].copy()
+        traj_config.set_velocities(np.zeros(traj_config.positions.shape))
 
         # set parameters for this run based on defaults, optionally overriden by traj_config.info["HAL_traj_params"]
         traj_params = default_traj_params.copy()
@@ -201,15 +202,24 @@ def HAL(fit_configs, traj_configs, basis_source, solver, fit_kwargs, n_iters, re
             settings_out = []
             for setting in args:
                 if isinstance(setting, (tuple, list)):
-                    assert len(setting) == 2, "Got ramp for item with other than 2 elements {setting}"
-                    settings_out.append(np.linspace(setting[0], setting[1], n_stages))
+                    if len(setting) == 2:
+                        settings_out.append(np.linspace(setting[0], setting[1], n_stages))
+                    elif len(setting) == 3:
+                        Ti = setting[0]
+                        Tf = setting[1]
+                        ramp_time = setting[2]
+                        n_ramp = round(ramp_time/traj_len)
+                        ramp_Ts = [Ti + (Tf-Ti)/n_ramp * i  if i < n_ramp else Tf for i in range(0, nsteps)]
+                        settings.out.append(rnp.array(ramp_Ts))
+                    #assert len(setting) == 2, "Got ramp for item with other than 2 elements {setting}"
+
                 else:
                     settings_out.append([setting] * n_stages)
 
             return n_stages, settings_out
 
         # set up T and P ramps
-        n_stages, (ramp_tau_rels, ramp_Ts, ramp_Ps) = _make_ramps(tau_rel, T_K, P_GPa, n_stages=20)
+        n_stages, (ramp_tau_rels, ramp_Ts, ramp_Ps) = _make_ramps(tau_rel, T_K, P_GPa, n_stages=50)
 
         t0 = time.time()
         # run dynamics for entire T ramp
